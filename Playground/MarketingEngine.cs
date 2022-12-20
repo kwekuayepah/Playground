@@ -6,116 +6,97 @@ public class MarketingEngine
 {
     private readonly List<Event> Events;
 
+    private IDictionary<string, int> cityDistance = new Dictionary<string, int>();
 
-    public MarketingEngine(List<Event> events)
+      public MarketingEngine(List<Event> events)
     {
         Events = events;
     }
 
-    public void SendNotifications(Customer customer, Event e)
+    public void CacheClosestCity(string location)
     {
-        Console.WriteLine($"{customer.Name} from {customer.City} event {e.Name} at {e.Date}");
-    }
 
-
-    public void AlertCustomerOnEventCloseToBirthday(Customer customer, List<Event> events)
-    {
-        /*
-     * 1. Get the customer's birth day and month against the current year
-     * 2. if the current date is greater than the customer date, at one to year, else year remains the same
-     * 3. Use lambda expression to filter records with condition above
-     * 4. Also select a customer events in city
-     * 5. Add both and send notification to user
-     */
-         
-        var customerBirthDate = new DateTime(DateTime.UtcNow.Year, customer.BirthDate.Month, customer.BirthDate.Day);
-        var currentDate = DateTime.UtcNow.Date;
-
-        var eventYear = (currentDate > customerBirthDate) ? customerBirthDate.Year + 1 : customerBirthDate.Year;
-
-
-        var customerBirthMonthEvents = events.Where(
-            x => x.Date.Month == customer.BirthDate.Month && x.Date.Year == eventYear
-        ).ToList();
-
-
-        var customerCityEvents = events.Where(
-            x => string.Equals(x.City, customer.City) && x.Date >= currentDate
-        ).ToList();
-
-        customerBirthMonthEvents.AddRange(customerCityEvents);
-
-        foreach (var item in customerBirthMonthEvents.Distinct())
+        foreach(var value in cityDistance)
         {
-            SendNotifications(customer, item);
+            Console.WriteLine($"{value.Key} and {value.Value}");
         }
-    }
-
-    public void Get5EventsClosestToCustomer(Customer customer, IDictionary<string,City> cities)
-    {
-        try
-        {
-            var customerCityExist = cities.ContainsKey(customer.City);
-
-            if (!customerCityExist)
-                return;
         
-            var customerCity = cities[customer.City];
+        var distance =0;
 
-            IDictionary<string, int> cityToDistanceDict = cities.Values.ToDictionary(x =>
-                    x.Name, x => Math.Abs(customerCity.X - x.X) + Math.Abs(customerCity.Y - x.Y)
-            );
-        
-            var events = Events.OrderBy(e => cityToDistanceDict[e.City]).Take(5).ToList();
+        var locations = location.Split(" - ").OrderByDescending(x=>x).ToList();
 
-            foreach (var item in events)
-            {
-                SendNotifications(customer, item);
-            }
-        }
-        catch (Exception e)
+        var key = $"{locations[0]} - {locations[1]}";
+
+        var locationExist = cityDistance.ContainsKey(key);
+
+        if(!locationExist)
         {
-            Console.WriteLine("An exception occured when getting 5 closest events to the customer" +
-                              $"message: {e.Message}" +
-                              $"stack trace: {e}");
-            
-        }
-      
-
-    }
-    
-    public void CacheClosestCities(string location)
-    {
-        /*
-     * 1. We will used redis string set data structure
-     * 2. the governance here is that the redis key should be in an ordered in ascending
-     * 3. from the function, split with hyphen and order list to ascending
-     * 4. Form the key structure to retrieve data from redis
-     * 5. if key does not exist , fetch from API
-     */
-        var distance = 0;
-        IDictionary<string, int> cities = new Dictionary<string, int>()
-        {
-            { "Boston - New York",400 },
-            { "Boston - Washington", 540 }
-        };
-
-        var locationBucket = location.Split(" - ").OrderBy(x => x).ToList();
-
-        if (!cities.ContainsKey($"{locationBucket[0]} - {locationBucket[1]}"))
-        {
-            //fetch from API
-            //store in cache
-            //assign value to distance
+            distance = 0;
         }
         else
         {
-            distance = cities[$"{locationBucket[0]} - {locationBucket[1]}"];
+            distance = cityDistance[key];
         }
-        
-        Console.WriteLine($"distance: {distance}");
-    }
-    
 
-   
+        Console.WriteLine($"The distance between {location} is {distance}");
+    }
+
+    public void AlertCustomerEventsClosestToCustomer(Customer customer,IDictionary<string, City> cities, int eventSize)
+    {
+        var customerCityExist = cities.ContainsKey(customer.City);
+
+        if(!customerCityExist)
+        {
+            return;
+        }
+
+        var customerCityInfo = cities[customer.City];
+
+        var cityToDistanceDict = cities.Values.ToDictionary(x=>x.Name,
+        x=> Math.Abs(customerCityInfo.X - x.X) + Math.Abs(customerCityInfo.Y - x.Y));
+
+        foreach(var value in cityToDistanceDict)
+        {
+            cityDistance.Add($"{customer.City} - {value.Key}", value.Value);
+        }
+
+        var events = Events.OrderBy(x=>cityToDistanceDict[x.City]).Take(eventSize).ToList();
+
+        foreach(var item in events)
+        { 
+            SendCustomerNotification(customer, item);
+        }
+
+    }
+
+    private void SendCustomerNotification(Customer customer, Event e)
+    {
+        Console.WriteLine($"{customer.Name} from {customer.City} event {e.Name} at {e.Date} at City {e.City}");
+    }
+
+    public void AlertCustomerOnEventsNearestToCity(Customer customer, int eventSize)
+    {
+        var customerBirthDate = new DateTime(DateTime.UtcNow.Year, customer.BirthDate.Month, customer.BirthDate.Day);
+
+        var currentDate = DateTime.UtcNow.Date;
+
+        var eventYear = (currentDate > customerBirthDate)? customerBirthDate.Year +1 : customerBirthDate.Year;
+
+        var events = Events.Where(x=>x.Date.Month >= customerBirthDate.Month && x.Date.Year == eventYear).OrderBy(x=>x.Date.Month).ToList();
+
+        foreach(var item in events.Take(eventSize))
+        {
+            SendCustomerNotification(customer, item);
+        }
+    }
+
+    public void AlertCustomerOnEventsInCity(Customer customer)
+    {
+        var events = Events.Where(x=>string.Equals(x.City, customer.City)).ToList();
+
+        foreach(var item in events)
+        {
+            SendCustomerNotification(customer, item);
+        }
+    }
 }

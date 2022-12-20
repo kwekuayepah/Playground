@@ -45,9 +45,13 @@ public class Program
         var orderByName = events.GetSortedEventsByField("Name");
 
         var marketingEngine = new MarketingEngine(events);
-        marketingEngine.AlertCustomerOnEventCloseToBirthday(customer, events);
-        marketingEngine.Get5EventsClosestToCustomer(customer, Cities);
-        marketingEngine.CacheClosestCities("New York - Boston");
+
+        //marketingEngine.AlertCustomerOnEventsInCity(customer);
+        //marketingEngine.AlertCustomerOnEventsNearestToCity(customer, 5);
+
+        marketingEngine.AlertCustomerEventsClosestToCustomer(customer, Cities, 10);
+
+        marketingEngine.CacheClosestCity("Boston - New York");
 
 
     }
