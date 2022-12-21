@@ -43,29 +43,39 @@ public class MarketingEngine
 
     public void AlertCustomerEventsClosestToCustomer(Customer customer,IDictionary<string, City> cities, int eventSize)
     {
-        var customerCityExist = cities.ContainsKey(customer.City);
-
-        if(!customerCityExist)
+        try
         {
-            return;
+            var customerCityExist = cities.ContainsKey(customer.City);
+
+            if(!customerCityExist)
+            {
+                return;
+            }
+
+            var customerCityInfo = cities[customer.City];
+
+            var cityToDistanceDict = cities.Values.ToDictionary(x=>x.Name,
+                x=> Math.Abs(customerCityInfo.X - x.X) + Math.Abs(customerCityInfo.Y - x.Y));
+
+            foreach(var value in cityToDistanceDict)
+            {
+                cityDistance.Add($"{customer.City} - {value.Key}", value.Value);
+            }
+
+            var events = Events.OrderBy(x=>cityToDistanceDict[x.City]).Take(eventSize).ToList();
+
+            foreach(var item in events)
+            { 
+                SendCustomerNotification(customer, item);
+            }
         }
-
-        var customerCityInfo = cities[customer.City];
-
-        var cityToDistanceDict = cities.Values.ToDictionary(x=>x.Name,
-        x=> Math.Abs(customerCityInfo.X - x.X) + Math.Abs(customerCityInfo.Y - x.Y));
-
-        foreach(var value in cityToDistanceDict)
+        catch (Exception e)
         {
-            cityDistance.Add($"{customer.City} - {value.Key}", value.Value);
+            Console.WriteLine($"An error occurred when retrieving city distance" +
+                              $"message: {e.Message}" +
+                              $"stack trace: {e}");
         }
-
-        var events = Events.OrderBy(x=>cityToDistanceDict[x.City]).Take(eventSize).ToList();
-
-        foreach(var item in events)
-        { 
-            SendCustomerNotification(customer, item);
-        }
+      
 
     }
 
